@@ -1,0 +1,218 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "retry": "Retry",
+    "friend": "friend"
+  },
+  "welcome": {
+    "title": "Sunog",
+    "subtitle": "AI Personal Song Generator",
+    "greeting": "Hello, {{name}}! 👋",
+    "create_song": "🎵 Create Song",
+    "my_orders": "📋 My Orders",
+    "profile": "👤 Profile",
+    "features": {
+      "ai": {
+        "title": "AI Technology",
+        "description": "Modern algorithms create unique lyrics"
+      },
+      "personal": {
+        "title": "Personal Approach",
+        "description": "Songs are created specifically for your occasion"
+      },
+      "quality": {
+        "title": "High Quality",
+        "description": "Professional lyrics with rhyme and structure"
+      },
+      "occasion": {
+        "title": "Any Occasion",
+        "description": "Birthday, wedding, love confession"
+      }
+    },
+    "how_it_works": {
+      "title": "How it works",
+      "step1": {
+        "title": "Fill the form",
+        "description": "Specify genre, mood, occasion and recipient"
+      },
+      "step2": {
+        "title": "Get draft",
+        "description": "AI creates song lyrics based on your wishes"
+      },
+      "step3": {
+        "title": "Edit",
+        "description": "Make changes to the text if needed"
+      },
+      "step4": {
+        "title": "Get result",
+        "description": "Download the finished song in text format"
+      }
+    }
+  },
+  "create": {
+    "title": "Create Song",
+    "step": "Step {{current}} of {{total}}",
+    "language": {
+      "title": "Choose language",
+      "description": "What language should the song be in?",
+      "ru": "Russian",
+      "kz": "Kazakh",
+      "en": "English"
+    },
+    "style": {
+      "title": "Style and genre",
+      "description": "Choose the genre and mood of the song",
+      "genre": "Genre",
+      "mood": "Mood",
+      "tempo": "Tempo",
+      "genres": {
+        "pop": "Pop",
+        "rock": "Rock",
+        "hip-hop": "Hip-hop",
+        "indie": "Indie",
+        "ballad": "Ballad",
+        "folk": "Folk",
+        "jazz": "Jazz",
+        "blues": "Blues",
+        "country": "Country",
+        "electronic": "Electronic"
+      },
+      "moods": {
+        "romantic": "Romantic",
+        "happy": "Happy",
+        "sad": "Sad",
+        "motivational": "Motivational",
+        "nostalgic": "Nostalgic",
+        "energetic": "Energetic",
+        "calm": "Calm",
+        "dramatic": "Dramatic"
+      },
+      "tempos": {
+        "slow": "Slow",
+        "medium": "Medium",
+        "fast": "Fast"
+      }
+    },
+    "occasion": {
+      "title": "Occasion and recipient",
+      "description": "Tell us about the occasion and who the song is for",
+      "occasion": "Occasion",
+      "recipient": "Recipient",
+      "notes": "Additional wishes",
+      "occasions": {
+        "birthday": "Birthday",
+        "anniversary": "Anniversary",
+        "wedding": "Wedding",
+        "valentine": "Valentine's Day",
+        "graduation": "Graduation",
+        "new_year": "New Year",
+        "mothers_day": "Mother's Day",
+        "fathers_day": "Father's Day",
+        "confession": "Love confession",
+        "apology": "Apology",
+        "congratulations": "Congratulations",
+        "farewell": "Farewell",
+        "other": "Other"
+      },
+      "notes_placeholder": "For example: mention hobbies, favorite places, special moments..."
+    },
+    "preview": {
+      "title": "Preview",
+      "description": "Check the data before creating",
+      "generate": "Generate lyrics",
+      "regenerate": "Regenerate"
+    }
+  },
+  "order": {
+    "status": {
+      "draft": "Draft",
+      "pending_lyrics": "Generating lyrics",
+      "lyrics_ready": "Lyrics ready",
+      "user_editing": "Editing",
+      "approved": "Approved",
+      "generating": "Generating audio",
+      "delivered": "Delivered",
+      "canceled": "Canceled"
+    },
+    "actions": {
+      "edit": "Edit",
+      "approve": "Approve",
+      "regenerate": "Regenerate",
+      "download": "Download",
+      "share": "Share"
+    },
+    "lyrics": {
+      "title": "Song lyrics",
+      "version": "Version {{version}}",
+      "edit": "Edit lyrics",
+      "approve": "Approve lyrics",
+      "regenerate": "Generate again",
+      "edit_placeholder": "Enter the corrected song lyrics..."
+    },
+    "audio": {
+      "title": "Audio version",
+      "generating": "Generating audio...",
+      "ready": "Audio ready",
+      "failed": "Audio generation error",
+      "download": "Download audio",
+      "play": "Play"
+    },
+    "payment": {
+      "title": "Payment",
+      "required": "Payment required",
+      "amount": "Amount: {{amount}} {{currency}}",
+      "pay": "Pay",
+      "paid": "Paid"
+    }
+  },
+  "orders": {
+    "title": "My Orders",
+    "empty": "You don't have any orders yet",
+    "create_first": "Create first order",
+    "filter": {
+      "all": "All",
+      "draft": "Drafts",
+      "pending": "In progress",
+      "ready": "Ready"
+    },
+    "search": "Search orders..."
+  },
+  "profile": {
+    "title": "Profile",
+    "language": "Interface language",
+    "notifications": "Notifications",
+    "about": "About app",
+    "support": "Support",
+    "version": "Version {{version}}"
+  },
+  "errors": {
+    "network": "Network error. Check your internet connection.",
+    "server": "Server error. Try again later.",
+    "auth": "Authentication error. Reload the page.",
+    "validation": "Check the correctness of filling in the fields.",
+    "not_found": "The requested resource was not found.",
+    "forbidden": "You don't have access to this resource.",
+    "rate_limit": "Too many requests. Wait a bit.",
+    "unknown": "An unknown error occurred."
+  },
+  "success": {
+    "order_created": "Order created successfully",
+    "order_updated": "Order updated",
+    "lyrics_generated": "Song lyrics generated",
+    "lyrics_edited": "Song lyrics edited",
+    "order_approved": "Order approved",
+    "audio_generated": "Audio version ready"
+  }
+}
+
