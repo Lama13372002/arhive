@@ -1,0 +1,198 @@
+Ты — Senior Full-Stack Tech Lead и архитектор. Генерируй сразу готовый к продакшену проект: чистый код, тесты, докеризация, миграции БД, CI/CD, логирование, метрики, безопасные практики и документация. Никаких заглушек, «скоро сделаем» и TODO — всё рабочее. Проект сразу должен локально подниматься docker compose up -d и быть готов к деплою.
+1) Цель продукта
+Telegram Mini App + Bot, в котором пользователь:
+заходит в мини-приложение через кнопку у бота,
+проходит мастер-шаги (жанр/настрой/язык/повод/ключевые фразы),
+получает черновик текста песни от GPT, правит и утверждает,
+при необходимости оплачивает (провайдер — модульная интеграция),
+отслеживает статус и забирает результат (текст, аудио/превью),
+видит историю заказов, может повторно заказать/редактировать.
+2) Технический стек (жёстко придерживаться)
+Backend: Python 3.11+, FastAPI, aiogram v3 (Telegram Bot), SQLAlchemy 2 + Alembic, PostgreSQL 15, Redis (кеш/сессии/очереди), Celery (фоновая генерация, webhook-обработка), Pydantic v2, httpx.
+AI: OpenAI/ Azure OpenAI (через абстракцию ai/llm.py). Обязательно конфиг через ENV для модели (по умолчанию gpt-4o-mini или актуальный аналог).
+Mini App (Front): React + TypeScript + Vite, Telegram WebApp SDK, TailwindCSS, shadcn/ui, Zustand (state), react-hook-form + zod (валидация), react-i18next (RU/KZ/EN).
+Файлы: S3-совместимое хранилище (например, Cloudflare R2/MinIO) через подписанные URL.
+Auth Mini App: Верификация initData Telegram WebApp на бэкенде (подпись HMAC).
+DevOps: Docker, docker-compose, Nginx (reverse proxy, HTTP->HTTPS редирект), GitHub Actions (lint+tests+build), .env.example, prod-ready конфиги.
+Наблюдаемость: Структурированное логирование (JSON), Sentry (ошибки), Prometheus метрики (uvicorn/fasapi + кастомные бизнес-метрики).
+Безопасность: rate limit, CORS, валидация входных данных, защита вебхука, секреты только из ENV.
+3) Архитектура и структура репозитория (монорепо)
+/app
+  /server             # FastAPI + aiogram + Celery
+    /api
+      v1/*.py         # роуты
+    /core             # конфиги, security, middlewares
+    /domain           # сущности, бизнес-логика (services, use-cases)
+    /models           # SQLAlchemy модели
+    /schemas          # Pydantic-схемы
+    /workers          # Celery таски
+    /integrations     # GPT, Telegram, S3, платежи, Suno* (флагом)
+    /migrations       # Alembic
+    main.py           # FastAPI app
+    bot.py            # aiogram (Dispatcher, Router)
+    celery.py         # Celery init
+  /miniapp            # React + TS + Vite (Telegram WebApp)
+    /src
+      /pages
+      /widgets
+      /components
+      /features
+      /stores         # Zustand
+      /lib            # api-клиент, utils
+      /i18n
+      /styles
+  /infra
+    docker-compose.yml
+    nginx.conf
+    k8s/* (опционально, но шаблоны манифестов положить)
+.env.example
+README.md
+4) Доменная модель и таблицы БД (миграции обязательны)
+users — id, tg_id, username, name, phone (nullable), locale, created_at.
+orders — id, user_id(FK), status(enum: draft → pending_lyrics → lyrics_ready → user_editing → approved → generating → delivered → canceled), language(enum: ru/kz/en), genre, mood, tempo, occasion, recipient, notes, price, currency, payment_status(enum: none/pending/paid/failed/refunded), created_at, updated_at.
+lyrics_versions — id, order_id(FK), version(int), text(md), gpt_model, prompt_used(jsonb), tokens_in/out, quality_score(float), status(enum: draft/ready/rejected), created_at.
+audio_assets — id, order_id(FK), kind(enum: preview/full), url, duration_sec, provider(enum: none/suno/inner), meta(jsonb), status(enum: queued/generating/ready/failed), created_at.
+payments — id, order_id(FK), provider, amount, currency, external_id, status(enum), paid_at, meta(jsonb).
+events_audit — id, order_id(FK nullable), user_id(FK nullable), type, payload(jsonb), created_at.
+Индексы по tg_id, order_id, status. Все enum — через Enum миграции.
+5) API контракты (REST, /api/v1, OpenAPI генерить)
+POST /auth/telegram/verify — принимает initData мини-аппы, возвращает session (JWT или HttpOnly cookie), user профайл.
+GET /orders — список заказов пользователя (пагинация).
+POST /orders — создать заказ (draft).
+PATCH /orders/{id} — обновить поля мастера (жанр/настрой/теги/язык и т.д.).
+POST /orders/{id}/lyrics/generate — запускает Celery-таск GPT; возвращает task_id.
+GET /orders/{id}/lyrics/latest — вернуть последнюю версию текста.
+POST /orders/{id}/lyrics/submit_edit — сохранить правки пользователя как новую версию.
+POST /orders/{id}/approve — переводит в approved.
+POST /orders/{id}/pay — создать платеж (интеграция провайдера зафлажена).
+POST /orders/{id}/generate_audio — опционально: очередь аудио-генерации (Suno/провайдер), task_id.
+GET /orders/{id} — карточка с прогрессом, активные шаги, статусы подзадач.
+Вебхуки: /telegram/webhook, /payments/callback, /audio/callback (Suno). Все — с подписью/секретом.
+Возвращаемые схемы — строго типизированы, с error_code/message. Валидация через zod на фронте и Pydantic на бэке.
+6) Бот (aiogram v3)
+Команды: /start, /help, /orders, /new.
+Кнопка «Открыть Mini App» (WebApp) на /start.
+Deep-link параметры startapp → прокидывать в Mini App (например, открыть черновик).
+Нотификации: при lyrics_ready, audio.ready, payment.paid — отправлять пользователю сообщение + кнопку «Открыть заказ».
+7) Mini App: UX-поток и экраны (современный UI)
+Общий стиль: адаптироваться под Telegram тему (light/dark). Tailwind + shadcn/ui. Закругления 2xl, мягкие тени, прогресс-индикатор, skeleton-загрузки, тосты.
+Экраны:
+Welcome (приветствие, CTA «Создать песню»)
+Мастер шагов:
+Шаг 1: Язык (RU/KZ/EN), стиль/жанр (карточки), настроение, темп
+Шаг 2: Повод/получатель/теги (what, who, ключевые фразы, «не упоминать»)
+Шаг 3: Структура песни (куплеты/припев/бридж), длительность/объем текста
+Шаг 4: Предпросмотр GPT-черновика (редактор с подсветкой правок, версии)
+Шаг 5: Подтверждение и (опционально) оплата
+Статус заказа (таймлайн, версии текста, кнопки «править/сгенерировать заново», «утвердить»)
+История (список заказов, фильтры/поиск)
+Профиль/настройки (язык интерфейса, уведомления)
+Компоненты: GenrePicker, MoodSelector, LanguageToggle, TagInput, TextGuidelines, LyricsEditor (с подсветкой изменений и счетчиком символов), VersionList, ApprovalBar, PaymentDialog, AudioPlayer, ProgressStepper.
+Состояние — Zustand; API-клиент — axios с перехватчиками; retry + экспоненциальный backoff на читающих запросах.
+8) Промпт для GPT (генерация текста песни)
+Сделай абстракцию LyricsService.generate(order, user_inputs). Запрос к LLM формируй так:
+System:
+«Ты — профессиональный русско- и казахскоязычный поэт-песенник-редактор. Строго соблюдай структуру, ритм и чистоту рифм, избегай штампов. Учитывай повод, адресата и желаемые эмоции. Текст должен быть оригинальным, без плагиата и без запрещенного контента. Если пользователь просит что-то спорное — предложи мягкую альтернативу.»
+User (примерный шаблон, собери из формы):
+Цель: персональная песня.
+Язык: {ru|kz|en} (при ru допускай 1–2 строки на kz/eng, если уместно; при kz — можно 1–2 строки на ru).
+Жанр/стиль: {pop/hip-hop/indie/ballad/raim-like/skriptonit-like/...}
+Настрой: {романтичный|весёлый|лиричный|драйвовый}
+Темп/размер: {средний, 90–110 BPM, 4/4}
+Повод: {день рождения/юбилей/свадьба/...}
+Получатель: {имя, отношение}
+Ключевые фразы: {список}
+Запретить упоминать: {список}
+Структура: 2 куплета по 8–12 строк, припев 4–6 строк (повторяется), при необходимости бридж 4 строки.
+Длительность текста: ~{N} слов/строк.
+Тон: искренний, образный, без пошлости.
+Assistant (формат ответа JSON):
+{
+  "title": "Короткий заголовок",
+  "tags": ["жанр","настрой","повод","язык"],
+  "sections": [
+    {"type":"verse","label":"Куплет 1","lines":["...","..."]},
+    {"type":"chorus","label":"Припев","lines":["...","..."]},
+    {"type":"verse","label":"Куплет 2","lines":["...","..."]},
+    {"type":"bridge","label":"Бридж","lines":["...","..."]},
+    {"type":"chorus","label":"Припев","lines":["...","..."]}
+  ],
+  "notes":"краткие пояснения если есть"
+}
+Бэкенд конвертирует JSON в markdown/текст, хранит как lyrics_versions. Поддержать перегенерацию (новая версия с ссылкой на предыдущий промпт и диффом).
+9) Интеграции (модульные)
+Payments: модуль integrations/payments/base.py + провайдер (на выбор: Stripe/Kaspi/ЮKassa — сделать один рабочий провайдер и абстракцию).
+S3: загрузка результатов/превью, генерация подписанных URL.
+Suno (опционально): флаг USE_SUNO=true → модуль integrations/audio/suno.py с очередью задач, webhook /audio/callback. Если false — кнопка «Скачать текст» и заглушка «аудио скоро» не показывать; вместо этого — «заказать озвучку позже».
+10) Фоновые задачи (Celery)
+generate_lyrics(order_id, prompt) — вызов LLM, сохранение версии, событие lyrics_ready.
+generate_audio(order_id) — если включено, опрос статуса, событие audio.ready.
+send_bot_notification(tg_id, template, payload) — уведомления.
+11) Безопасность
+Проверка подписи initData Telegram (RFC-совместимая HMAC).
+Все вебхуки с секретом в заголовке.
+Rate limits: глобально и per-user (например, 30 r/m), защищать эндпоинты генерации.
+Очистка PII в логах; секреты только через ENV; CORS только с домена мини-аппы.
+Валидация входа через Pydantic и zod, строгие схемы.
+12) Наблюдаемость и качество
+Логи JSON с полями trace_id, user_id, order_id.
+Прометей: счетчики генераций, ошибки LLM, среднее время ответа.
+Sentry: исключения фронт/бэк, sourcemaps.
+Тесты: pytest (unit + интеграционные для API), vitest для фронта. Покрытие ≥70%.
+Линтеры/форматтеры: ruff + black (python), eslint + prettier (ts).
+13) Локальный запуск и деплой
+docker-compose.yml: server, worker, db, redis, minio, nginx, (опц.) prometheus, grafana.
+.env.example со всеми переменными: TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_WEBHOOK_SECRET, OPENAI_API_KEY, POSTGRES_*, REDIS_URL, S3_*, SENTRY_DSN, BASE_URL, FRONTEND_URL, JWT_SECRET, PAYMENTS_*, USE_SUNO.
+Команды:
+миграции: alembic upgrade head
+генерация клиента: (если используешь openapi typescript) — скрипт в miniapp.
+сборка фронта: pnpm build/npm run build.
+Nginx конфиг с прокси /api/ → server:8000, /bot/webhook → server, / → мини-аппа статика.
+14) UX-детали и аксессибилити
+Инлайн-подсказки: как писать ключевые фразы/что избегать.
+Предпросмотр текста с метками ритмики/слогов (лайт).
+Undo/Redo в редакторе, подсветка изменений между версиями.
+i18n: RU/KZ полностью, по умолчанию — по initData.user.language_code. Дата/время — Asia/Almaty.
+Адаптив: хорошо смотрится на iPhone SE/Android малых экранов.
+Перфоманс: загрузка <1s на повторных заходах (кеширование справочников), бандл-сплиттинг.
+15) Бизнес-правила
+После утверждения текста (approved) редактирование блокируется; возможна «новая версия» как новый заказ со скидкой (фича-флаг).
+Перегенерация ограничена (например, 3 бесплатных), далее платно — это параметризуется в config.
+Хранить версии и аудио-assets ≥180 дней (константа в конфиге).
+16) Документация
+README.md: схема архитектуры, команды, переменные окружения, последовательность запуска, FAQ.
+OpenAPI доступно на /docs и /openapi.json.
+Диаграммы последовательностей (PlantUML или mermaid) для ключевых потоков: аутентификация Mini App, генерация текста, уведомления, платежи.
+17) Проверка готовности (Acceptance Criteria)
+docker compose up -d → все сервисы стартуют без ошибок.
+Регистрация вебхука бота (скрипт или эндпоинт) и получение апдейтов.
+Mini App открывается из бота через кнопку, авторизация проходит (initData верифицируется).
+Мастер-поток полностью проходит: ввод → генерация → правки → утверждение → (оплата, если включено) → получение результата.
+Нотификации в Telegram приходят.
+История заказов работает, версии текста видны, дифф подсвечивается.
+Тесты проходят в CI, линтеры без ошибок.
+Sentry получает тестовое исключение, Prometheus показывает метрики.
+18) Пошаговый план генерации в Cursor (выполняй строго по этапам)
+Скаффолдинг монорепо с указанной структурой, пакетами и базовой конфигурацией Docker + docker-compose + .env.example + README.
+Backend: инициализация FastAPI, конфиг, базы (Postgres), Redis, Celery; модели и миграции Alembic; базовые роуты /health, /auth/telegram/verify.
+Bot (aiogram v3): команды, кнопка Mini App, обработка вебхука, утилиты уведомлений.
+Auth Mini App: верификация initData (сервер), front SDK и автологин, хранение сессии (HttpOnly cookie/JWT).
+Domain: Orders: модели, сервисы, CRUD API, статусы, события, аудит.
+LyricsService + GPT: системный промпт, JSON-формат ответа, парсинг, сохранение версий, лимиты на перегенерации.
+Mini App: страницы/компоненты мастера, редактор текста с версиями, i18n RU/KZ/EN, темизация под Telegram, состояние (Zustand), формы (react-hook-form+zod).
+Payments (1 провайдер): создание платежа, callback, обновление статусов; фронтовый диалог оплаты.
+Audio (флагом): очередь, генерация/вебхук/отображение плеера; отдельно вынести интерфейс провайдера.
+S3: загрузка/подпись, хранение assets; ссылка для скачивания.
+Безопасность: rate limit, секреты, CORS, логирование PII-safe.
+Наблюдаемость: Sentry, Prometheus, health-checks, бизнес-метрики.
+Тесты: unit/интеграционные (API, сервисы), фронт-тесты, покрытия; GitHub Actions.
+Nginx и Launch: готовый конфиг, проверка локального запуска.
+Финальный проход Acceptance Criteria и обновление документации.
+19) Финальные требования к качеству кода
+Чистая архитектура: контроллеры тонкие, бизнес-логика в сервисах, интеграции за интерфейсами.
+Никаких захардкоженных ключей/секретов/URL — только ENV.
+Комментарии там, где есть нетривиальная логика; типы везде.
+Обработчики ошибок унифицированы, коды ошибок документированы.
+Логи и метрики на ключевых переходах статусов заказа.
+Имена сущностей и полей — говорящие и единообразные.
+Сгенерируй весь проект сразу, следуя этапам и структуре. После каждого крупного этапа — добавь/обнови README раздел «Статус реализации» с командами запуска/проверки. Результат должен быть полностью работоспособен локально и готов к деплою в прод.
